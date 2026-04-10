@@ -2,8 +2,8 @@ name: Daily AI News Post
 
 on:
   schedule:
-    - cron: '0 8 * * *'  # Runs every day at 8:00 AM UTC (9AM UK time)
-  workflow_dispatch:       # Also allows manual trigger from GitHub
+    - cron: '0 */3 * * *'  # Runs every 3 hours (8 times a day)
+  workflow_dispatch:         # Manual trigger from GitHub
 
 jobs:
   post-news:
