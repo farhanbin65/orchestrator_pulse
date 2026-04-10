@@ -1,5 +1,11 @@
 import feedparser
 import random
+import re
+import socket
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Global timeout for all feed requests
+socket.setdefaulttimeout(8)
 
 FEEDS = [
     "https://techcrunch.com/category/artificial-intelligence/feed/",
@@ -33,28 +39,36 @@ FEEDS = [
     "https://www.silicon.co.uk/e-innovation/artificial-intelligence/rss"
 ]
 
+def fetch_feed(feed_url):
+    """Fetch a single feed and return list of stories."""
+    stories = []
+    try:
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries[:5]:
+            title = entry.get("title", "").strip()
+            summary = entry.get("summary", entry.get("description", "")).strip()
+            link = entry.get("link", "")
+            source = feed.feed.get("title", "AI News")
+            if title and len(title) > 20:
+                summary = re.sub('<[^<]+?>', '', summary)[:300]
+                stories.append({
+                    "title": title,
+                    "summary": summary,
+                    "link": link,
+                    "source": source
+                })
+    except Exception as e:
+        print(f"⚠️  Skipped {feed_url}: {e}")
+    return stories
+
 def get_top_stories(count=3):
     stories = []
-    for feed_url in FEEDS:
-        try:
-            feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:5]:
-                title = entry.get("title", "").strip()
-                summary = entry.get("summary", entry.get("description", "")).strip()
-                link = entry.get("link", "")
-                source = feed.feed.get("title", "AI News")
-                if title and len(title) > 20:
-                    # Strip HTML tags simply
-                    import re
-                    summary = re.sub('<[^<]+?>', '', summary)[:300]
-                    stories.append({
-                        "title": title,
-                        "summary": summary,
-                        "link": link,
-                        "source": source
-                    })
-        except Exception as e:
-            print(f"Error fetching {feed_url}: {e}")
+
+    # Fetch all feeds in parallel — 29 feeds in ~8s instead of potentially minutes
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_feed, url): url for url in FEEDS}
+        for future in as_completed(futures):
+            stories.extend(future.result())
 
     # Shuffle and return top N unique stories
     random.shuffle(stories)
@@ -66,6 +80,7 @@ def get_top_stories(count=3):
             unique.append(s)
         if len(unique) >= count:
             break
+
     return unique
 
 if __name__ == "__main__":
