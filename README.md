@@ -10,9 +10,14 @@ This project automatically runs 8 times a day via GitHub Actions. Each run:
 
 1. Scrapes the latest AI news from 30+ RSS feeds (TechCrunch, The Verge, OpenAI, DeepMind, arXiv, and more)
 2. Picks a fresh story and generates a branded image card using Python Pillow
-3. Posts the card to the [Orchestrator Pulse](https://www.facebook.com/OrchestratorPulse) Facebook page with a caption and hashtags
+3. Posts the card to the [Orchestrator Pulse](https://www.facebook.com/profile.php?id=61572118407211) Facebook page with a caption and hashtags
 
 No manual work required after setup.
+
+<img width="725" height="619" alt="image" src="https://github.com/user-attachments/assets/f28ddb84-e6ba-40b9-8b8d-d1aae88e6c20" />
+<img width="515" height="759" alt="image" src="https://github.com/user-attachments/assets/3d87484a-a3d8-4909-bc01-7e660d93aca3" />
+<img width="1445" height="692" alt="Screenshot 2026-04-10 115348" src="https://github.com/user-attachments/assets/194d7358-b036-40e3-8b23-a8c90f058ef3" />
+
 
 ---
 
