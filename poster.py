@@ -1,13 +1,23 @@
 import requests
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Always load .env from the same folder as this file — works regardless of where you run from
+load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
-PAGE_ID    = os.getenv("PAGE_ID")
-PAGE_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
+def post_card_to_facebook(image_path, story, page_id=None, token=None):
+    PAGE_ID    = page_id or os.getenv("PAGE_ID")
+    PAGE_TOKEN = token   or os.getenv("PAGE_ACCESS_TOKEN")
 
-def post_card_to_facebook(image_path, story):
+    # Catch missing credentials immediately with a clear message
+    if not PAGE_ID or PAGE_ID == "0":
+        print(f"❌ PAGE_ID is missing or invalid: '{PAGE_ID}' — check your .env file")
+        return False
+    if not PAGE_TOKEN:
+        print("❌ PAGE_ACCESS_TOKEN is missing — check your .env file")
+        return False
+
     caption = (
         f"🤖 {story['title']}\n\n"
         f"{story['summary'][:200]}...\n\n"
@@ -16,33 +26,27 @@ def post_card_to_facebook(image_path, story):
         f"#AI #ArtificialIntelligence #AINews #TechNews #OrchestratorPulse"
     )
 
-    with open(image_path, "rb") as img_file:
-        response = requests.post(
-            f"https://graph.facebook.com/v19.0/{PAGE_ID}/photos",
-            data={
-                "caption": caption,
-                "published": "true",     
-                "no_story": "false",     
-                "access_token": PAGE_TOKEN
-            },
-            files={"source": img_file}
-        )
+    try:
+        with open(image_path, "rb") as img_file:
+            response = requests.post(
+                f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos",
+                data={
+                    "caption":   caption,
+                    "published": "true",
+                    "access_token": PAGE_TOKEN
+                },
+                files={"source": img_file}
+            )
 
-    result = response.json()
-    if "id" in result:
-        print(f"✅ Posted successfully! Post ID: {result['id']}")
-        return True
-    else:
-        print(f"❌ Post failed: {result}")
+        result = response.json()
+
+        if "id" in result:
+            print(f"✅ Posted successfully! Post ID: {result['id']}")
+            return True
+        else:
+            print(f"❌ Post failed: {result}")
+            return False
+
+    except Exception as e:
+        print(f"❌ Exception during posting: {e}")
         return False
-
-if __name__ == "__main__":
-    test_story = {
-        "title": "Test Post from Orchestrator Pulse Pipeline",
-        "summary": "This is a test of the automated posting pipeline.",
-        "source": "Test",
-        "link": "https://facebook.com"
-    }
-    from card_generator import generate_card
-    card_path = generate_card(test_story, 0)
-    post_card_to_facebook(card_path, test_story)

@@ -64,11 +64,13 @@ def fetch_feed(feed_url):
 def get_top_stories(count=3):
     stories = []
 
-    # Fetch all feeds in parallel — 29 feeds in ~8s instead of potentially minutes
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(fetch_feed, url): url for url in FEEDS}
-        for future in as_completed(futures):
-            stories.extend(future.result())
+        for future in as_completed(futures, timeout=15):  # ← add timeout=15
+            try:
+                stories.extend(future.result())
+            except Exception as e:
+                print(f"⚠️  Feed timed out, skipping...")
 
     # Shuffle and return top N unique stories
     random.shuffle(stories)
@@ -82,11 +84,3 @@ def get_top_stories(count=3):
             break
 
     return unique
-
-if __name__ == "__main__":
-    stories = get_top_stories(3)
-    for i, s in enumerate(stories, 1):
-        print(f"\n--- Story {i} ---")
-        print(f"Title: {s['title']}")
-        print(f"Source: {s['source']}")
-        print(f"Summary: {s['summary'][:100]}...")
