@@ -23,7 +23,11 @@ def run_pipeline():
 
     # Step 2: Generate card
     print("\n[2/3] Generating card...")
-    card_path = generate_card(story, 0)
+    try:
+        card_path = generate_card(story, 0)
+    except Exception as e:
+        print(f"❌ Card generation failed: {e}")
+        return
 
     # Step 3: Post to Facebook
     print("\n[3/3] Posting to Facebook...")
