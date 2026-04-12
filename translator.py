@@ -11,9 +11,9 @@ def translate_to_bangla(text):
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are a translator. Translate the given text to Bangla. Return only the translated text, nothing else. No explanations, no English text."
+               {
+                "role": "system",
+                "content": "You are a professional Bangla news writer. Rewrite the given English news into natural, fluent Bangla. Do not translate word-for-word. Adapt phrases so they sound natural to Bangla readers. Use simple, clear, and commonly used Bangla words. Avoid awkward literal translations. Keep the meaning accurate but improve readability and flow. Write in a news style tone."
                 },
                 {
                     "role": "user",
