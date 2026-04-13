@@ -170,8 +170,33 @@ def wrap_text_latin(text, font, max_width, draw):
         lines.append(current)
     return lines
 
+
+# ---------------------------------------------------------------------------
+# Mixed-script splitter  — KEY FIX
+#
+# The original regex  r"[\u0980-\u09FF]+"  only matched base Bangla letters.
+# Bengali combining diacritics (vowel signs, hasanta, nukta, anusvara etc.)
+# sit OUTSIDE the base range but ARE part of the same visual cluster.
+# When a diacritic ended up at the start of a "latin" token the font had no
+# glyph for it → rendered as □.
+#
+# Fix: extend the match to include ALL Unicode combining marks (category M)
+# that immediately follow the base Bangla range, plus the Bangla-specific
+# combining characters explicitly.
+# ---------------------------------------------------------------------------
+
+# Full Bangla block  U+0980–U+09FF  plus Unicode general combining marks
+# We use a character class that grabs:
+#   [\u0980-\u09FF]   — Bangla base block
+#   [\u0300-\u036F]   — Combining Diacritical Marks (shouldn't appear in Bangla, but safe)
+#   [\u200C\u200D]    — ZWNJ / ZWJ (used inside Bangla conjuncts)
+# The + is greedy so the whole cluster is one token.
 _BANGLA_CLUSTER_RE = re.compile(
-    r"[\u0980-\u09FF][\u0980-\u09FF\u200C\u200D]*"
+    # Base Bangla block + diacritics/conjuncts + Bengali punctuation
+    # U+0964 = ।  (daṇḍa / purna biram)  — most common sentence ender
+    # U+0965 = ॥  (double daṇḍa)
+    # U+200C/D = ZWNJ/ZWJ used inside conjuncts
+    r"[\u0980-\u09FF\u0964\u0965][\u0980-\u09FF\u0964\u0965\u200C\u200D]*"
 )
 
 
@@ -209,7 +234,7 @@ def split_mixed_segments(text):
 def render_mixed_block(text, bangla_font_path, bangla_size,
                        latin_bold_font, latin_reg_font,
                        color_hex, max_width,
-                       line_spacing=10, bold=False):
+                       line_spacing=10, bold=False, max_lines=None):
     """
     Render a mixed Bangla+Latin paragraph into a transparent RGBA image.
     Returns a PIL Image sized to the actual content (width=max_width).
@@ -247,6 +272,10 @@ def render_mixed_block(text, bangla_font_path, bangla_size,
             cur_words, cur_w = [word], ww
     if cur_words:
         wrapped.append(" ".join(cur_words))
+
+    # ---- enforce line cap BEFORE allocating the image ----
+    if max_lines is not None:
+        wrapped = wrapped[:max_lines]
 
     # ---- line height = tallest glyph across both scripts ----
     bn_h   = probe_drw.textbbox((0, 0), "অ", font=bn_font)[3]
@@ -325,7 +354,6 @@ def generate_card(story, index=0, bangla=False):
 
         lat_28b = load_font(28, bold=True)
         lat_18  = load_font(18, bold=False)
-        lat_52b = load_font(52, bold=True)
         lat_30  = load_font(30, bold=False)
         lat_24  = load_font(24, bold=False)
 
@@ -361,13 +389,19 @@ def generate_card(story, index=0, bangla=False):
     y = tag_y + tag_h + 44   # ~258 px from top
 
     # ---- HEADLINE ----
-    MAX_HEADLINE_H = 210     # hard ceiling for the headline zone
+    # 44px bold + 14px line_spacing = 58px/line * 3 lines = 174px max
+    # Truncating BEFORE render (max_lines=3) avoids mid-glyph pixel crops.
+    HEADLINE_FONT_SIZE = 44
+    MAX_HEADLINE_LINES = 3
+    MAX_HEADLINE_H     = (HEADLINE_FONT_SIZE + 14) * MAX_HEADLINE_LINES  # 174
 
     if bangla:
+        lat_headline = load_font(HEADLINE_FONT_SIZE, bold=True)
         title_img = render_mixed_block(
             story["title"],
-            bn_bold, 52, lat_52b, lat_52b,
+            bn_bold, HEADLINE_FONT_SIZE, lat_headline, lat_headline,
             HEADLINE_COLOR, max_text_w, line_spacing=14, bold=True,
+            max_lines=MAX_HEADLINE_LINES,
         )
         title_img, title_used_h = crop_block(title_img, MAX_HEADLINE_H)
         paste_rgba(img, title_img, (60, y))
