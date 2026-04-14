@@ -21,7 +21,6 @@ def run_pipeline():
         return
 
     story = stories[0]
-    print(f"Story: {story['title'][:80]}...")
 
     # 2. English card
     print("\n[2/4] Generating English card...")
@@ -42,16 +41,13 @@ def run_pipeline():
 
     # 4. Bangla pipeline
     print("\n[4/4] Bangla pipeline...")
-
     try:
         bangla_story = {
-            "title": translate_to_bangla(story["title"]),
-            "summary": translate_to_bangla(story["summary"]),
+            "title": translate_to_bangla(story["title"], is_headline=True),
+            "summary": translate_to_bangla(story["summary"], is_headline=False),
             "source": story["source"],
             "link": story["link"]
         }
-
-        print(f"Bangla title: {bangla_story['title'][:80]}...")
 
         print("Generating Bangla card...")
         bangla_card = generate_card(bangla_story, 1, bangla=True)
@@ -68,12 +64,10 @@ def run_pipeline():
         print(f"❌ Bangla pipeline failed: {e}")
         success_bn = False
 
-    # Summary
     print("\n" + "=" * 50)
     print(f"English post: {'✅ Published' if success_en else '❌ Failed'}")
     print(f"Bangla post:  {'✅ Published' if success_bn else '❌ Failed'}")
     print("=" * 50)
-
 
 if __name__ == "__main__":
     run_pipeline()
