@@ -18,6 +18,7 @@ This project automatically runs 8 times a day via GitHub Actions. Each run:
 No manual work required after setup.
 
 <img width="725" height="619" alt="image" src="https://github.com/user-attachments/assets/f28ddb84-e6ba40b9-8b8d-d1aae88e6c20" />
+<img width="685" height="732" alt="image" src="https://github.com/user-attachments/assets/c37b4e18-acef-46b3-b41a-8f192b5c92e8" />
 <img width="515" height="759" alt="image" src="https://github.com/user-attachments/assets/3d87484a-a3d8-4909-bc01-7e660d93aca3" />
 <img width="1445" height="692" alt="Screenshot 2026-04-10 115348" src="https://github.com/user-attachments/assets/194d7358-b036-40e3-8b23-a8c90f058ef3" />
 
