@@ -42,13 +42,14 @@ jobs:
 
       - name: Create .env from GitHub secrets
         run: |
-          echo "PAGE_ID=${{ secrets.PAGE_ID }}"                                 >> .env
-          echo "PAGE_ACCESS_TOKEN=${{ secrets.PAGE_ACCESS_TOKEN }}"             >> .env
-          echo "APP_ID=${{ secrets.APP_ID }}"                                   >> .env
-          echo "APP_SECRET=${{ secrets.APP_SECRET }}"                           >> .env
-          echo "BANGLA_PAGE_ID=${{ secrets.BANGLA_PAGE_ID }}"                   >> .env
+          echo "PAGE_ID=${{ secrets.PAGE_ID }}"                                   >> .env
+          echo "PAGE_ACCESS_TOKEN=${{ secrets.PAGE_ACCESS_TOKEN }}"               >> .env
+          echo "APP_ID=${{ secrets.APP_ID }}"                                     >> .env
+          echo "APP_SECRET=${{ secrets.APP_SECRET }}"                             >> .env
+          echo "BANGLA_PAGE_ID=${{ secrets.BANGLA_PAGE_ID }}"                     >> .env
           echo "BANGLA_PAGE_ACCESS_TOKEN=${{ secrets.BANGLA_PAGE_ACCESS_TOKEN }}" >> .env
-          echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}"                       >> .env
+          echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}"                         >> .env
+          echo "UNSPLASH_ACCESS_KEY=${{ secrets.UNSPLASH_ACCESS_KEY }}"           >> .env
 
       - name: Run pipeline
         run: xvfb-run python main.py
