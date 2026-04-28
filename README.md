@@ -26,27 +26,6 @@ No manual work required after setup.
 
 ---
 
-## Project structure
-RSS Feeds (30+)
-│
-▼
-scraper.py ──── fetches latest AI stories (parallelised with ThreadPoolExecutor)
-│
-▼
-main.py ──── extract_query(English title)
-│
-▼
-Unsplash API ──── shared_image.jpg (fetched ONCE)
-│
-├──── card_generator.py (English card + shared image) ──► poster.py ──► English Facebook Page
-│
-└──── translator.py (Groq / LLaMA 3.3 70B)
-│
-▼
-card_generator.py (Bangla card + same shared image) ──► poster.py ──► Bangla Facebook Page
-
----
-
 ## Setup (for your own pages)
 
 ### 1. Clone the repo
