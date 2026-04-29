@@ -26,7 +26,7 @@ def run_pipeline():
     print("\n[🖼️] Fetching Unsplash image...")
     query = extract_query(story["title"])
     print(f"  🔍 Query: '{query}'")
-    shared_image_path = fetch_unsplash_image(
+    shared_image_path = fetch_article_image(
         query,
         save_path="output/shared_image.jpg"
     )
