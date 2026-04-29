@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from scraper import get_top_stories
-from card_generator import generate_card, extract_query, fetch_unsplash_image
+from card_generator import generate_card, extract_query, fetch_article_image
 from poster import post_card_to_facebook
 from translator import translate_to_bangla
 

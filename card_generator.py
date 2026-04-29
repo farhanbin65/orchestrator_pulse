@@ -1,7 +1,7 @@
 import os
 import re
+import random
 import requests
-import glob
 from dotenv import load_dotenv
 from PIL import Image, ImageDraw, ImageFont
 
@@ -16,80 +16,235 @@ SOURCE_COLOR, DIVIDER_COLOR = "#888888", "#333333"
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 
-# ── Unsplash config ───────────────────────────────────────────────────────────
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+PEXELS_API_KEY      = os.getenv("PEXELS_API_KEY")
+GROQ_API_KEY        = os.getenv("GROQ_API_KEY")
 
-def extract_query(title):
+# ── Query Generation ──────────────────────────────────────────────────────────
+
+def extract_query_ai(title):
+    """Use Groq/LLaMA to generate a unique, visual, specific image search query."""
+    if not GROQ_API_KEY:
+        return extract_query_fallback(title)
+    try:
+        from groq import Groq
+        client = Groq(api_key=GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{
+                "role": "user",
+                "content": (
+                    "You are helping find a photo for a news card. "
+                    "Given the headline below, return ONLY a 3-5 word image search query "
+                    "that describes a specific, visual, photographic scene — NOT abstract concepts. "
+                    "Think like a photo editor: what would you actually photograph?\n\n"
+                    "Rules:\n"
+                    "- Be specific and visual (e.g. 'engineer testing robot arm' not 'robotics technology')\n"
+                    "- Avoid generic words like 'technology', 'digital', 'futuristic', 'abstract'\n"
+                    "- Return ONLY the query, no punctuation, no explanation\n\n"
+                    f"Headline: {title}"
+                )
+            }],
+            max_tokens=20,
+            temperature=0.9   # higher = more variety per run
+        )
+        query = response.choices[0].message.content.strip().strip('"').strip("'")
+        print(f"  🤖 Groq query: '{query}'")
+        return query
+    except Exception as e:
+        print(f"  ⚠️  Groq query failed: {e} — using fallback")
+        return extract_query_fallback(title)
+
+
+def extract_query_fallback(title):
+    """Keyword-based fallback when Groq is unavailable."""
     title_lower = title.lower()
+
+    # More specific keyword map — avoids generic "AI technology" repeats
     keyword_map = {
-        "gpt": "artificial intelligence chatbot",
-        "chatgpt": "AI chatbot interface",
-        "openai": "artificial intelligence technology",
-        "google": "google AI technology",
-        "deepmind": "AI research lab",
-        "meta": "AI social media technology",
-        "robot": "humanoid robot",
-        "robotics": "robot technology",
-        "chip": "AI computer chip",
-        "nvidia": "GPU chip technology",
-        "llm": "large language model AI",
-        "ai": "artificial intelligence",
-        "model": "AI neural network",
-        "startup": "tech startup office",
-        "data": "data center servers",
-        "cyber": "cyber security technology",
-        "vision": "computer vision AI",
-        "voice": "voice AI assistant"
+        "chatgpt":      "person using AI chatbot on laptop",
+        "gpt":          "AI language model interface screen",
+        "openai":       "tech researcher working at computer",
+        "gemini":       "Google AI research lab",
+        "deepmind":     "scientist working on neural network",
+        "claude":       "AI assistant conversation interface",
+        "meta":         "social media AI data center",
+        "llama":        "open source AI model code",
+        "llm":          "data scientist training language model",
+        "robot":        "humanoid robot in warehouse",
+        "robotics":     "engineer testing robot arm",
+        "autonomous":   "self driving car sensors",
+        "self-driving": "autonomous vehicle on highway",
+        "chip":         "semiconductor chip manufacturing",
+        "nvidia":       "GPU server data center",
+        "data center":  "rows of servers data center",
+        "quantum":      "quantum computing laboratory",
+        "startup":      "tech startup team whiteboard",
+        "funding":      "venture capital business meeting",
+        "regulation":   "government building policy meeting",
+        "copyright":    "legal books gavel courtroom",
+        "privacy":      "cybersecurity lock encrypted data",
+        "cyber":        "hacker dark room screens",
+        "health":       "AI medical diagnosis hospital",
+        "drug":         "pharmaceutical lab research",
+        "climate":      "renewable energy solar panels",
+        "energy":       "wind turbines power grid",
+        "image":        "AI image generation art studio",
+        "video":        "AI video production studio",
+        "voice":        "microphone voice assistant speaker",
+        "search":       "person searching on computer",
+        "agent":        "AI workflow automation dashboard",
+        "model":        "deep learning training visualization",
     }
+
     for key, value in keyword_map.items():
         if key in title_lower:
             return value
-    stopwords = {"a","an","the","and","or","for","in","on","of","to","is",
-                 "with","how","why","what","this","that","are","was","has","will","from","by","as","at","it","be"}
-    words = [w.strip(".,:-") for w in title_lower.split() if w not in stopwords]
-    important = [w for w in words if len(w) > 3][:2]
-    return " ".join(important) + " technology" if important else "artificial intelligence technology"
 
-def fetch_unsplash_image(query, save_path="output/article_image.jpg"):
+    # Extract meaningful words as last resort
+    stopwords = {
+        "a","an","the","and","or","for","in","on","of","to","is","with",
+        "how","why","what","this","that","are","was","has","will","from",
+        "by","as","at","it","be","its","new","says","say","could","would"
+    }
+    words = [w.strip(".,:-") for w in title_lower.split() if w not in stopwords and len(w) > 3]
+    return " ".join(words[:3]) + " technology" if words else "AI research laboratory"
+
+
+# ── Image Fetchers ────────────────────────────────────────────────────────────
+
+def fetch_unsplash_image(query, save_path):
     if not UNSPLASH_ACCESS_KEY:
-        print("  ⚠️  UNSPLASH_ACCESS_KEY not set — skipping image fetch")
+        print("  ⚠️  UNSPLASH_ACCESS_KEY not set")
+        return None
+    try:
+        res = requests.get(
+            "https://api.unsplash.com/photos/random",
+            params={
+                "query":          query,
+                "orientation":    "squarish",
+                "content_filter": "high",
+                "count":          10        # fetch 10, pick one randomly → more variety
+            },
+            headers={"Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"},
+            timeout=8
+        )
+        res.raise_for_status()
+        photos = res.json()
+
+        # photos is a list when count > 1
+        if isinstance(photos, list) and photos:
+            photo = random.choice(photos)
+        elif isinstance(photos, dict):
+            photo = photos
+        else:
+            return None
+
+        img_url   = photo["urls"]["regular"]
+        img_bytes = requests.get(img_url, timeout=10).content
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        with open(save_path, "wb") as f:
+            f.write(img_bytes)
+        print(f"  📷 Unsplash: '{query}'")
+        return save_path
+
+    except Exception as e:
+        print(f"  ⚠️  Unsplash failed: {e}")
         return None
 
-    queries = [
-        query,
-        query + " technology",
-        query + " futuristic",
-        "artificial intelligence",
-        "AI technology"
-    ]
-    for q in queries:
-        try:
-            res = requests.get(
-                "https://api.unsplash.com/photos/random",
-                params={
-                    "query": q,
-                    "orientation": "squarish",
-                    "content_filter": "high",
-                    "order_by": "relevant"
-                },
-                headers={"Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"},
-                timeout=8
-            )
-            res.raise_for_status()
-            data = res.json()
-            img_url = data["urls"]["regular"]
-            img_bytes = requests.get(img_url, timeout=10).content
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            with open(save_path, "wb") as f:
-                f.write(img_bytes)
-            print(f"  📷 Unsplash query: '{q}'")
-            return save_path
-        except Exception as e:
-            print(f"  ⚠️  Unsplash query '{q}' failed: {e}")
-            continue
 
-    print("  ⚠️  All Unsplash queries failed — card will have no image")
+def fetch_pexels_image(query, save_path):
+    if not PEXELS_API_KEY:
+        print("  ⚠️  PEXELS_API_KEY not set")
+        return None
+    try:
+        res = requests.get(
+            "https://api.pexels.com/v1/search",
+            params={
+                "query":       query,
+                "orientation": "square",
+                "per_page":    15,
+                "page":        random.randint(1, 5)   # random page = variety
+            },
+            headers={"Authorization": PEXELS_API_KEY},
+            timeout=8
+        )
+        res.raise_for_status()
+        data    = res.json()
+        photos  = data.get("photos", [])
+
+        if not photos:
+            print(f"  ⚠️  Pexels: no results for '{query}'")
+            return None
+
+        photo     = random.choice(photos)
+        img_url   = photo["src"]["large"]
+        img_bytes = requests.get(img_url, timeout=10).content
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        with open(save_path, "wb") as f:
+            f.write(img_bytes)
+        print(f"  📷 Pexels: '{query}'")
+        return save_path
+
+    except Exception as e:
+        print(f"  ⚠️  Pexels failed: {e}")
+        return None
+
+
+def fetch_article_image(query, save_path="output/shared_image.jpg"):
+    """
+    Randomly picks Unsplash or Pexels as primary source.
+    Falls back to the other if primary fails.
+    Falls back to a broader query if both fail on specific query.
+    """
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    # Randomly assign primary/fallback so both APIs get used over time
+    if random.random() < 0.5:
+        primary,  primary_name  = fetch_unsplash_image, "Unsplash"
+        fallback, fallback_name = fetch_pexels_image,   "Pexels"
+    else:
+        primary,  primary_name  = fetch_pexels_image,   "Pexels"
+        fallback, fallback_name = fetch_unsplash_image, "Unsplash"
+
+    print(f"  🎲 Trying {primary_name} first...")
+
+    # Try specific query on primary
+    result = primary(query, save_path)
+    if result:
+        return result
+
+    # Try specific query on fallback
+    print(f"  🔄 Falling back to {fallback_name}...")
+    result = fallback(query, save_path)
+    if result:
+        return result
+
+    # Both failed on specific query — try broader fallback queries
+    broader_queries = [
+        "artificial intelligence research",
+        "technology innovation",
+        "computer science lab",
+        "AI data center"
+    ]
+    for bq in broader_queries:
+        print(f"  🔄 Trying broader query: '{bq}'")
+        result = primary(bq, save_path)
+        if result:
+            return result
+        result = fallback(bq, save_path)
+        if result:
+            return result
+
+    print("  ❌ All image sources failed — text-only card")
     return None
+
+
+# ── extract_query (public API used by main.py) ────────────────────────────────
+def extract_query(title):
+    """Main entry point — uses Groq if available, falls back to keyword map."""
+    return extract_query_ai(title)
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def hex_to_rgb(h):
@@ -145,7 +300,9 @@ def get_bangla_font_path(bold=False):
     name = "NotoSansBengali-Bold.ttf" if bold else "NotoSansBengali-Regular.ttf"
     return os.path.join(ASSETS_DIR, name)
 
-_BANGLA_CLUSTER_RE = re.compile(r"[\u0980-\u09FF\u0964\u0965][\u0980-\u09FF\u0964\u0965\u200C\u200D]*")
+_BANGLA_CLUSTER_RE = re.compile(
+    r"[\u0980-\u09FF\u0964\u0965][\u0980-\u09FF\u0964\u0965\u200C\u200D]*"
+)
 
 def split_mixed_segments(text):
     segments, last = [], 0
@@ -158,8 +315,9 @@ def split_mixed_segments(text):
         segments.append(("latin", text[last:]))
     return segments or [("latin", text)]
 
-def render_mixed_block(text, bn_path, bn_sz, la_bold, la_reg, col, max_w, spacing=12, bold=False, max_lines=None):
-    rgb = hex_to_rgb(col)
+def render_mixed_block(text, bn_path, bn_sz, la_bold, la_reg, col, max_w,
+                        spacing=12, bold=False, max_lines=None):
+    rgb  = hex_to_rgb(col)
     bn_f = ImageFont.truetype(bn_path, bn_sz)
     la_f = la_bold if bold else la_reg
     words = text.split(" ")
@@ -167,7 +325,8 @@ def render_mixed_block(text, bn_path, bn_sz, la_bold, la_reg, col, max_w, spacin
     space_px = ImageDraw.Draw(Image.new("RGBA", (1, 1))).textbbox((0, 0), " ", font=la_f)[2]
     for word in words:
         ww = sum(
-            ImageDraw.Draw(Image.new("RGBA", (1, 1))).textbbox((0, 0), c, font=(bn_f if s == "bangla" else la_f))[2]
+            ImageDraw.Draw(Image.new("RGBA", (1, 1))).textbbox((0, 0), c,
+                font=(bn_f if s == "bangla" else la_f))[2]
             for s, c in split_mixed_segments(word)
         )
         if not current_line or current_w + space_px + ww <= max_w:
@@ -181,8 +340,8 @@ def render_mixed_block(text, bn_path, bn_sz, la_bold, la_reg, col, max_w, spacin
     if max_lines:
         wrapped = wrapped[:max_lines]
     line_h = max(bn_sz + 5, 35)
-    out = Image.new("RGBA", (max_w, (line_h + spacing) * len(wrapped)), (0, 0, 0, 0))
-    d = ImageDraw.Draw(out)
+    out    = Image.new("RGBA", (max_w, (line_h + spacing) * len(wrapped)), (0, 0, 0, 0))
+    d      = ImageDraw.Draw(out)
     curr_y = 0
     for line in wrapped:
         curr_x = 0
@@ -193,27 +352,24 @@ def render_mixed_block(text, bn_path, bn_sz, la_bold, la_reg, col, max_w, spacin
         curr_y += line_h + spacing
     return out
 
+
 # ── Card Generator ────────────────────────────────────────────────────────────
 def generate_card(story, index=0, bangla=False, article_image_path=None):
     """
-    Flow: Header → Badge → Headline → Accent bar → Unsplash image → Footer
-    Pass article_image_path=None to auto-fetch from Unsplash using the story title.
-    Pass article_image_path="some/path.jpg" to reuse an already-downloaded image
-    (so English and Bangla cards share the same Unsplash photo).
+    Flow: Header → Badge → Headline → Accent bar → Photo → Footer
+    article_image_path=None  → auto-fetch via Groq query + Unsplash/Pexels
+    article_image_path=path  → reuse already-downloaded image (English + Bangla share one fetch)
     """
-
-    # ── Auto-fetch Unsplash image if not supplied ─────────────────────────────
     if article_image_path is None:
         query = extract_query(story["title"])
-        print(f"  🔍 Unsplash query: '{query}'")
         img_save = os.path.join(OUTPUT_DIR, f"article_image_{index}.jpg")
-        article_image_path = fetch_unsplash_image(query, save_path=img_save)
+        article_image_path = fetch_article_image(query, save_path=img_save)
 
     img  = Image.new("RGB", (CARD_W, CARD_H), hex_to_rgb(BG_COLOR))
     draw = ImageDraw.Draw(img)
     max_text_w = CARD_W - 120
 
-    # 1. Header — logo + page name
+    # 1. Header
     logo_path = os.path.join(ASSETS_DIR, "logo.png")
     if os.path.exists(logo_path):
         logo   = Image.open(logo_path).convert("RGBA").resize((90, 90), Image.LANCZOS)
@@ -223,8 +379,8 @@ def generate_card(story, index=0, bangla=False, article_image_path=None):
         img.paste(logo,   (52, 52), logo)
 
     if bangla:
-        bn_bold = get_bangla_font_path(True)
-        lat_28b = load_font(28, True)
+        bn_bold  = get_bangla_font_path(True)
+        lat_28b  = load_font(28, True)
         name_img = render_mixed_block(
             "অর্কেস্ট্রেটর পালস", bn_bold, 28, lat_28b, lat_28b,
             ACCENT_COLOR, max_text_w, bold=True
@@ -233,9 +389,9 @@ def generate_card(story, index=0, bangla=False, article_image_path=None):
         draw.text((160, 94), "Daily AI News & Trends",
                   font=load_font(18), fill=hex_to_rgb(SOURCE_COLOR))
     else:
-        draw.text((160, 58),  "Orchestrator Pulse",
+        draw.text((160, 58), "Orchestrator Pulse",
                   font=load_font(28, True), fill=hex_to_rgb(ACCENT_COLOR))
-        draw.text((160, 94),  "Daily AI News & Trends",
+        draw.text((160, 94), "Daily AI News & Trends",
                   font=load_font(18),       fill=hex_to_rgb(SOURCE_COLOR))
 
     # 2. Badge + divider
@@ -245,10 +401,10 @@ def generate_card(story, index=0, bangla=False, article_image_path=None):
 
     y = 280
 
-    # 3. Headline — 3 lines max, then stop (image goes below)
+    # 3. Headline
     if bangla:
-        bn_bold  = get_bangla_font_path(True)
-        lat_h    = load_font(44, True)
+        bn_bold   = get_bangla_font_path(True)
+        lat_h     = load_font(44, True)
         title_img = render_mixed_block(
             story["title"], bn_bold, 44, lat_h, lat_h,
             HEADLINE_COLOR, max_text_w, spacing=14, bold=True, max_lines=3
@@ -267,18 +423,16 @@ def generate_card(story, index=0, bangla=False, article_image_path=None):
     draw.rectangle([60, y, 160, y + 4], fill=hex_to_rgb(ACCENT_COLOR))
     y += 24
 
-    # 5. Unsplash image — fills space between headline and footer
+    # 5. Photo — fills space between headline and footer
     FOOTER_H  = 100
     image_top = y
-    image_h   = CARD_H - FOOTER_H - image_top - 20   # dynamic height
+    image_h   = CARD_H - FOOTER_H - image_top - 20
 
     if article_image_path and os.path.exists(article_image_path):
         try:
             art      = Image.open(article_image_path).convert("RGB")
             target_w = CARD_W - 120
             target_h = image_h
-
-            # Centre-crop to exact target ratio
             src_w, src_h = art.size
             if (src_w / src_h) > (target_w / target_h):
                 new_w = int(src_h * target_w / target_h)
@@ -288,10 +442,7 @@ def generate_card(story, index=0, bangla=False, article_image_path=None):
                 new_h = int(src_w * target_h / target_w)
                 art   = art.crop((0, (src_h - new_h) // 2,
                                    src_w, (src_h - new_h) // 2 + new_h))
-
             art  = art.resize((target_w, target_h), Image.LANCZOS)
-
-            # Rounded corners via mask
             mask = Image.new("L", (target_w, target_h), 0)
             ImageDraw.Draw(mask).rounded_rectangle(
                 [0, 0, target_w, target_h], radius=16, fill=255
@@ -300,11 +451,10 @@ def generate_card(story, index=0, bangla=False, article_image_path=None):
             art.putalpha(mask)
             img.paste(art, (60, image_top), art)
             print(f"  🖼️  Image embedded at y={image_top}, h={image_h}px")
-
         except Exception as e:
             print(f"  ⚠️  Image embed failed: {e}")
     else:
-        print("  ℹ️  No image available — text-only card")
+        print("  ℹ️  No image — text-only card")
 
     # 6. Footer
     footer_y = CARD_H - 90

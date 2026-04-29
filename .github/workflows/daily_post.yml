@@ -50,6 +50,7 @@ jobs:
           echo "BANGLA_PAGE_ACCESS_TOKEN=${{ secrets.BANGLA_PAGE_ACCESS_TOKEN }}" >> .env
           echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}"                         >> .env
           echo "UNSPLASH_ACCESS_KEY=${{ secrets.UNSPLASH_ACCESS_KEY }}"           >> .env
+          echo "PEXELS_API_KEY=${{ secrets.PEXELS_API_KEY }}"                    >> .env
 
       - name: Run pipeline
         run: xvfb-run python main.py
