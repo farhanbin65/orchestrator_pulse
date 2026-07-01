@@ -8,15 +8,37 @@ on:
 jobs:
   post-news:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write        # ← needed for the auto-commit
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      # ── Keep-alive: commit every 50 days so GitHub never pauses ──
+      - name: Keep Actions alive
+        run: |
+          LAST=$(cat .last_alive 2>/dev/null || echo "0")
+          NOW=$(date +%s)
+          DIFF=$(( (NOW - LAST) / 86400 ))
+          if [ "$DIFF" -ge 50 ]; then
+            echo $NOW > .last_alive
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .last_alive
+            git commit -m "chore: keep-alive [skip ci]"
+            git push
+            echo " Keep-alive commit pushed ($DIFF days since last)"
+          else
+            echo "ℹ  No keep-alive needed ($DIFF days since last, threshold 50)"
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+      
+      # (paste the rest of your current steps here)
 
       - name: Install system dependencies
         run: |
