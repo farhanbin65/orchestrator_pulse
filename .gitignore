@@ -3,3 +3,4 @@ __pycache__/
 .env
 output/
 draft.txt.DS_Store
+.DS_Store
