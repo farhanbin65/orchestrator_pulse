@@ -3,7 +3,7 @@ import random
 import re
 import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
+from concurrent.futures import TimeoutError as FuturesTimeout
 # Global timeout for all feed requests
 socket.setdefaulttimeout(8)
 
@@ -66,11 +66,14 @@ def get_top_stories(count=3):
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(fetch_feed, url): url for url in FEEDS}
-        for future in as_completed(futures, timeout=15):  # ← add timeout=15
-            try:
-                stories.extend(future.result())
-            except Exception as e:
-                print(f"⚠️  Feed timed out, skipping...")
+        try:
+            for future in as_completed(futures, timeout=30):
+                try:
+                    stories.extend(future.result())
+                except Exception as e:
+                    print(f"⚠️  Feed failed: {e}")
+        except FuturesTimeout:
+            print("⚠️  Some feeds timed out; continuing with the ones that finished.")
 
     # Shuffle and return top N unique stories
     random.shuffle(stories)
