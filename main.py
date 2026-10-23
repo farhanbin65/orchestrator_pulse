@@ -4,6 +4,7 @@ from scraper import get_top_stories
 from card_generator import generate_card, extract_query, fetch_article_image
 from poster import post_card_to_facebook
 from translator import translate_to_bangla
+from instagram_poster import post_card_to_instagram
 
 load_dotenv()
 
@@ -52,6 +53,14 @@ def run_pipeline():
         token=os.getenv("PAGE_ACCESS_TOKEN")
     )
 
+    success_ig_en = post_card_to_instagram(
+        english_card,
+        story,
+        ig_user_id=os.getenv("IG_EN_USER_ID"),
+        token=os.getenv("PAGE_ACCESS_TOKEN"),
+        lang="en",
+    )
+
     # 4. Bangla pipeline
     print("\n[4/4] Bangla pipeline...")
     try:
@@ -61,6 +70,7 @@ def run_pipeline():
             "source":  story["source"],
             "link":    story["link"]
         }
+
 
         print("Generating Bangla card...")
         bangla_card = generate_card(
@@ -80,11 +90,18 @@ def run_pipeline():
     except Exception as e:
         print(f"❌ Bangla pipeline failed: {e}")
         success_bn = False
-
+        
+    success_ig_bn = post_card_to_instagram(
+        bangla_card,
+        bangla_story,
+        ig_user_id=os.getenv("IG_BN_USER_ID"),
+        token=os.getenv("BANGLA_PAGE_ACCESS_TOKEN"),
+        lang="bn",
+    )
     print("\n" + "=" * 50)
     print(f"English post: {'✅ Published' if success_en else '❌ Failed'}")
     print(f"Bangla post:  {'✅ Published' if success_bn else '❌ Failed'}")
     print("=" * 50)
-
+  
 if __name__ == "__main__":
     run_pipeline()

@@ -5,17 +5,20 @@ on:
     - cron: '0 */3 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: daily-post
+  cancel-in-progress: false
+
 jobs:
   post-news:
     runs-on: ubuntu-latest
     permissions:
-      contents: write        # ← needed for the auto-commit
+      contents: write
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # ── Keep-alive: commit every 50 days so GitHub never pauses ──
       - name: Keep Actions alive
         run: |
           LAST=$(cat .last_alive 2>/dev/null || echo "0")
@@ -28,17 +31,15 @@ jobs:
             git add .last_alive
             git commit -m "chore: keep-alive [skip ci]"
             git push
-            echo " Keep-alive commit pushed ($DIFF days since last)"
+            echo "Keep-alive commit pushed ($DIFF days since last)"
           else
-            echo "ℹ  No keep-alive needed ($DIFF days since last, threshold 50)"
+            echo "No keep-alive needed ($DIFF days since last, threshold 50)"
           fi
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
-      # (paste the rest of your current steps here)
 
       - name: Install system dependencies
         run: |
@@ -63,16 +64,31 @@ jobs:
             bangla-text-renderer
 
       - name: Create .env from GitHub secrets
+        env:
+          PAGE_ID: ${{ secrets.PAGE_ID }}
+          PAGE_ACCESS_TOKEN: ${{ secrets.PAGE_ACCESS_TOKEN }}
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+          BANGLA_PAGE_ID: ${{ secrets.BANGLA_PAGE_ID }}
+          BANGLA_PAGE_ACCESS_TOKEN: ${{ secrets.BANGLA_PAGE_ACCESS_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          IG_EN_USER_ID: ${{ secrets.IG_EN_USER_ID }}
+          IG_BN_USER_ID: ${{ secrets.IG_BN_USER_ID }}
         run: |
-          echo "PAGE_ID=${{ secrets.PAGE_ID }}"                                   >> .env
-          echo "PAGE_ACCESS_TOKEN=${{ secrets.PAGE_ACCESS_TOKEN }}"               >> .env
-          echo "APP_ID=${{ secrets.APP_ID }}"                                     >> .env
-          echo "APP_SECRET=${{ secrets.APP_SECRET }}"                             >> .env
-          echo "BANGLA_PAGE_ID=${{ secrets.BANGLA_PAGE_ID }}"                     >> .env
-          echo "BANGLA_PAGE_ACCESS_TOKEN=${{ secrets.BANGLA_PAGE_ACCESS_TOKEN }}" >> .env
-          echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}"                         >> .env
-          echo "UNSPLASH_ACCESS_KEY=${{ secrets.UNSPLASH_ACCESS_KEY }}"           >> .env
-          echo "PEXELS_API_KEY=${{ secrets.PEXELS_API_KEY }}"                    >> .env
+          printf '%s=%s\n' \
+            PAGE_ID "$PAGE_ID" \
+            PAGE_ACCESS_TOKEN "$PAGE_ACCESS_TOKEN" \
+            APP_ID "$APP_ID" \
+            APP_SECRET "$APP_SECRET" \
+            BANGLA_PAGE_ID "$BANGLA_PAGE_ID" \
+            BANGLA_PAGE_ACCESS_TOKEN "$BANGLA_PAGE_ACCESS_TOKEN" \
+            GROQ_API_KEY "$GROQ_API_KEY" \
+            UNSPLASH_ACCESS_KEY "$UNSPLASH_ACCESS_KEY" \
+            PEXELS_API_KEY "$PEXELS_API_KEY" \
+            IG_EN_USER_ID "$IG_EN_USER_ID" \
+            IG_BN_USER_ID "$IG_BN_USER_ID" > .env
 
       - name: Run pipeline
         run: xvfb-run python main.py
